@@ -1,40 +1,44 @@
 package chat;
 
+import chat.windows.Settings;
 import javax.swing.*;
-import javax.swing.text.DefaultCaret;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.io.IOException;
 import java.net.*;
 
 public class Chat extends JFrame {
+    public final static int SERVICE_PORT = 50001;
+
     private JTextField inputChat;
     private JButton sendMessageButton;
     private JTextArea textChat;
     private JList chatUsers;
-    private JTextField userName;
     private JPanel content;
     private JButton clearButton;
-    private JTextField serverIP;
-    private DefaultListModel<String> model = new DefaultListModel<String>();
     private DatagramSocket clientSocket;
     private InetAddress IPAddress;
 
-    public final static int SERVICE_PORT = 50001;
+    JMenuBar menuBar;
+    JMenu menu;
+    JMenuItem menuItem;
 
-    public Chat() throws SocketException, UnknownHostException {
+    private DefaultListModel<String> model = new DefaultListModel<>();
+    private String serverIp;
+    private String userName = "";
+
+    public Chat() {
         sendMessageButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (userName.getText().isEmpty()) {
+                if (userName.isEmpty()) {
                     textChat.setText(textChat.getText() + "PLEASE SET YOUR NICKNAME" + "\n");
                 } else {
                     if (!inputChat.getText().isEmpty()) {
                         String sendTo = String.valueOf(chatUsers.getSelectedValue());
                         try {
-                            sendToServer(userName.getText() + ": " + inputChat.getText());
+                            sendToServer(userName + ": " + inputChat.getText());
                         } catch (IOException ex) {
                             ex.printStackTrace();
                         }
@@ -42,15 +46,6 @@ public class Chat extends JFrame {
                     }
                 }
 
-            }
-        });
-        userName.addKeyListener(new KeyAdapter() {
-
-            @Override
-            public void keyReleased(KeyEvent e) {
-                model.removeAllElements();
-                model.addElement(userName.getText().toUpperCase());
-                chatUsers.setModel(model);
             }
         });
         clearButton.addActionListener(new ActionListener() {
@@ -63,7 +58,7 @@ public class Chat extends JFrame {
 
     private void sendToServer(String text) throws IOException {
         try {
-            IPAddress = InetAddress.getByName(serverIP.getText());
+            IPAddress = InetAddress.getByName(serverIp);
             byte[] sendingDataBuffer = new byte[1024];
             sendingDataBuffer = text.getBytes();
             DatagramPacket sendingPacket = new DatagramPacket(sendingDataBuffer, sendingDataBuffer.length, IPAddress, SERVICE_PORT);
@@ -79,14 +74,55 @@ public class Chat extends JFrame {
         chat.setTitle("Chat");
         chat.setContentPane(chat.content);
         chat.setSize(600, 400);
+        chat.setResizable(false);
         chat.setLocationRelativeTo(null);
         chat.clearButton.setMnemonic('X');
         chat.sendMessageButton.getRootPane().setDefaultButton(chat.sendMessageButton);
+
+        chat.menuBar = new JMenuBar();
+        chat.menu = new JMenu("Settings");
+        chat.menuBar.add(chat.menu);
+        chat.menu.setMnemonic(KeyEvent.VK_S);
+        chat.menuItem = new JMenuItem("Server / Nickname",
+                KeyEvent.VK_T);
+
+        chat.menuItem.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Settings settings = new Settings();
+                if (chat.serverIp != null) {
+                    settings.settingServer.setText(chat.serverIp);
+                }
+                settings.settingName.setText(chat.userName);
+                settings.setTitle("Settings");
+                settings.setContentPane(settings.panelSettings);
+                settings.setSize(300, 150);
+                settings.setResizable(false);
+                settings.setLocationRelativeTo(null);
+                settings.setVisible(true);
+                settings.settingSaveButton.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        chat.setUserName(settings.settingName.getText());
+                        chat.setServerIp(settings.settingServer.getText());
+                        chat.model.removeAllElements();
+                        chat.model.addElement(settings.settingName.getText().toUpperCase());
+                        chat.chatUsers.setModel(chat.model);
+                        try {
+                            chat.sendToServer(settings.settingName.getText().toUpperCase() + ": connect to SERVER");
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                });
+
+            }
+        });
+        chat.menu.add(chat.menuItem);
+        chat.setJMenuBar(chat.menuBar);
         chat.setDefaultCloseOperation(EXIT_ON_CLOSE);
         chat.setVisible(true);
-//        for (int i = 0; i < 14; i++) {
-//            chat.textChat.setText(chat.textChat.getText() + i + "\n");
-//        }
+
         Thread t1 = new Thread(chat.new UpdatePacket());
         t1.start();
     }
@@ -117,5 +153,13 @@ public class Chat extends JFrame {
                 }
             }
         }
+    }
+
+    public void setServerIp(String serverIp) {
+        this.serverIp = serverIp;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
     }
 }
