@@ -7,6 +7,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.io.IOException;
 import java.net.*;
+import java.nio.charset.Charset;
 
 public class Chat extends JFrame {
     public final static int SERVICE_PORT = 50001;
@@ -60,7 +61,7 @@ public class Chat extends JFrame {
         try {
             IPAddress = InetAddress.getByName(serverIp);
             byte[] sendingDataBuffer = new byte[1024];
-            sendingDataBuffer = text.getBytes();
+            sendingDataBuffer = text.getBytes(Charset.forName("UTF-8"));
             DatagramPacket sendingPacket = new DatagramPacket(sendingDataBuffer, sendingDataBuffer.length, IPAddress, SERVICE_PORT);
             clientSocket.send(sendingPacket);
         } catch (IOException e) {
