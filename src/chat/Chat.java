@@ -1,24 +1,22 @@
 package chat;
 
 import chat.windows.Settings;
+
 import javax.swing.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.KeyEvent;
+import java.awt.event.*;
 import java.io.IOException;
 import java.net.*;
 import java.nio.charset.Charset;
 
 public class Chat extends JFrame {
-    public final static int SERVICE_PORT = 50001;
-
+    private final static int SERVICE_PORT = 50001;
     private JTextField inputChat;
     private JButton sendMessageButton;
     private JTextArea textChat;
     private JList chatUsers;
     private JPanel content;
     private JButton clearButton;
-    private DatagramSocket clientSocket;
+    private static DatagramSocket clientSocket;
     private InetAddress IPAddress;
 
     JMenuBar menuBar;
@@ -29,12 +27,69 @@ public class Chat extends JFrame {
     private String serverIp;
     private String userName = "";
 
-    public Chat() {
+    public static void main(String[] args) throws IOException {
+        Thread thread = new Thread(new UpdatePacket());
+        thread.start();
+    }
+
+    public Chat() throws SocketException {
+        clientSocket = new DatagramSocket();
+        setTitle("Chat");
+        setContentPane(content);
+        setSize(600, 400);
+        setResizable(false);
+        setLocationRelativeTo(null);
+        clearButton.setMnemonic('X');
+        sendMessageButton.getRootPane().setDefaultButton(sendMessageButton);
+
+        menuBar = new JMenuBar();
+        menu = new JMenu("Settings");
+        menuBar.add(menu);
+        menu.setMnemonic(KeyEvent.VK_S);
+        menuItem = new JMenuItem("Server / Nickname", KeyEvent.VK_T);
+
+        menuItem.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Settings settings = new Settings();
+                if (serverIp != null) {
+                    settings.settingServer.setText(serverIp);
+                }
+                settings.settingName.setText(userName);
+                settings.setTitle("Settings");
+                settings.setContentPane(settings.panelSettings);
+                settings.setSize(300, 150);
+                settings.setResizable(false);
+                settings.setLocationRelativeTo(null);
+                settings.setVisible(true);
+                settings.settingSaveButton.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        setUserName(settings.settingName.getText());
+                        setServerIp(settings.settingServer.getText());
+                        model.removeAllElements();
+                        model.addElement(settings.settingName.getText().toUpperCase());
+                        chatUsers.setModel(model);
+                        try {
+                            sendToServer(settings.settingName.getText().toUpperCase() + ": connect to SERVER");
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                });
+
+            }
+        });
+        menu.add(menuItem);
+        setJMenuBar(menuBar);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setVisible(true);
+
         sendMessageButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (userName.isEmpty()) {
-                    textChat.setText(textChat.getText() + "PLEASE SET YOUR NICKNAME" + "\n");
+                    setTextChat("PLEASE SET YOUR NICKNAME");
                 } else {
                     if (!inputChat.getText().isEmpty()) {
                         String sendTo = String.valueOf(chatUsers.getSelectedValue());
@@ -65,94 +120,7 @@ public class Chat extends JFrame {
             DatagramPacket sendingPacket = new DatagramPacket(sendingDataBuffer, sendingDataBuffer.length, IPAddress, SERVICE_PORT);
             clientSocket.send(sendingPacket);
         } catch (IOException e) {
-            textChat.setText(textChat.getText() + "Please enter correct SERVER IP\n");
-        }
-    }
-
-    public static void main(String[] args) throws IOException {
-        Chat chat = new Chat();
-        chat.clientSocket = new DatagramSocket();
-        chat.setTitle("Chat");
-        chat.setContentPane(chat.content);
-        chat.setSize(600, 400);
-        chat.setResizable(false);
-        chat.setLocationRelativeTo(null);
-        chat.clearButton.setMnemonic('X');
-        chat.sendMessageButton.getRootPane().setDefaultButton(chat.sendMessageButton);
-
-        chat.menuBar = new JMenuBar();
-        chat.menu = new JMenu("Settings");
-        chat.menuBar.add(chat.menu);
-        chat.menu.setMnemonic(KeyEvent.VK_S);
-        chat.menuItem = new JMenuItem("Server / Nickname",
-                KeyEvent.VK_T);
-
-        chat.menuItem.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                Settings settings = new Settings();
-                if (chat.serverIp != null) {
-                    settings.settingServer.setText(chat.serverIp);
-                }
-                settings.settingName.setText(chat.userName);
-                settings.setTitle("Settings");
-                settings.setContentPane(settings.panelSettings);
-                settings.setSize(300, 150);
-                settings.setResizable(false);
-                settings.setLocationRelativeTo(null);
-                settings.setVisible(true);
-                settings.settingSaveButton.addActionListener(new ActionListener() {
-                    @Override
-                    public void actionPerformed(ActionEvent e) {
-                        chat.setUserName(settings.settingName.getText());
-                        chat.setServerIp(settings.settingServer.getText());
-                        chat.model.removeAllElements();
-                        chat.model.addElement(settings.settingName.getText().toUpperCase());
-                        chat.chatUsers.setModel(chat.model);
-                        try {
-                            chat.sendToServer(settings.settingName.getText().toUpperCase() + ": connect to SERVER");
-                        } catch (IOException ex) {
-                            ex.printStackTrace();
-                        }
-                    }
-                });
-
-            }
-        });
-        chat.menu.add(chat.menuItem);
-        chat.setJMenuBar(chat.menuBar);
-        chat.setDefaultCloseOperation(EXIT_ON_CLOSE);
-        chat.setVisible(true);
-
-        Thread t1 = new Thread(chat.new UpdatePacket());
-        t1.start();
-    }
-
-    private class UpdatePacket implements Runnable {
-        byte[] receivingDataBuffer = new byte[1024];
-        DatagramPacket receivePacket;
-        String receivedData;
-        String userName;
-
-        @Override
-        public void run() {
-            receivePacket = new DatagramPacket(receivingDataBuffer, receivingDataBuffer.length);
-            while (true) {
-                try {
-                    clientSocket.receive(receivePacket);
-                    receivedData = new String(receivePacket.getData(), 0, receivePacket.getLength());
-                    userName = receivedData.split(":")[0];
-                    if (!model.contains(userName)) {
-                        textChat.setText(textChat.getText() + "new user connected (" + userName.toUpperCase() + ")" + "\n");
-                        model.addElement(userName);
-                        chatUsers.setModel(model);
-                    }
-                    textChat.setText(textChat.getText() + receivedData + "\n");
-                    System.out.println(receivedData);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
+            setTextChat("Please enter correct SERVER IP");
         }
     }
 
@@ -162,5 +130,25 @@ public class Chat extends JFrame {
 
     public void setUserName(String userName) {
         this.userName = userName;
+    }
+
+    public void setTextChat(String s) {
+        this.textChat.setText(textChat.getText() + s + "\n");
+    }
+
+    public DatagramSocket getClientSocket() {
+        return clientSocket;
+    }
+
+    public DefaultListModel getModel() {
+        return this.model;
+    }
+
+    public void setModel(String model) {
+        this.model.addElement(model);
+    }
+
+    public void setChatUsers(DefaultListModel model) {
+        this.chatUsers.setModel(model);
     }
 }
